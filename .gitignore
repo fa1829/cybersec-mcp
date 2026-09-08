@@ -1,25 +1,27 @@
+# Secrets — nothing below this line may ever be committed
+.env
+*.pem
+*.key
+audit.jsonl
+.cybersec-mcp/
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-.env
-.venv
+.venv/
 venv/
 env/
-
-# Node / TypeScript
-node_modules/
+*.egg-info/
+dist/
 build/
-*.js.map
+.pytest_cache/
+.ruff_cache/
 
-# OS
+# OS / IDE
 .DS_Store
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
+
+# Windows NTFS alternate data streams, created when copying from /mnt/c
+*:Zone.Identifier

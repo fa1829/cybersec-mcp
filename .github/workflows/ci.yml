@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check . --select E,F,W,B,S,ASYNC --ignore E501,S101
+
+      - name: Test
+        run: pytest
+        env:
+          # Tests must never touch the network or a real audit path.
+          CYBERSEC_MCP_AUDIT: "0"
+
+      - name: Server starts and reports its manifest
+        run: python server.py --manifest
+
+  # A tool description in MCP is an instruction the model acts on, so changing
+  # one changes agent behaviour with no code change anywhere else. Pinning the
+  # digest turns that into a failing build instead of a silent drift.
+  manifest-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Compare manifest digest against the pinned value
+        run: |
+          EXPECTED=$(tr -d ' \n' < .manifest-digest)
+          ACTUAL=$(python server.py --manifest | grep -oE '[0-9a-f]{64}' | head -1)
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Tool manifest changed. If this was intentional, update .manifest-digest in the same commit and say why in the message."
+            exit 1
+          fi
+
+  audit-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install pip-audit
+      - name: Known vulnerabilities in dependencies
+        run: pip-audit -r requirements.txt --strict
